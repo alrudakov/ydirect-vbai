@@ -25,20 +25,12 @@ def get_campaigns(token: str) -> dict:
         "Content-Type": "application/json",
     }
     
+    # Минимальный запрос без фильтров
     body = {
         "method": "get",
         "params": {
             "SelectionCriteria": {},
-            "FieldNames": [
-                "Id",
-                "Name", 
-                "Status",
-                "State",
-                "Type",
-                "StartDate",
-                "DailyBudget",
-                "Statistics"
-            ]
+            "FieldNames": ["Id", "Name", "State", "Status"]
         }
     }
     
@@ -66,6 +58,8 @@ def main():
     
     if not campaigns:
         print("Кампаний не найдено")
+        print("\nСырой ответ API:")
+        print(json.dumps(result, indent=2, ensure_ascii=False))
         return
     
     print(f"Найдено кампаний: {len(campaigns)}\n")
@@ -77,6 +71,7 @@ def main():
         print(f"Тип: {camp.get('Type')}")
         print(f"Статус: {camp.get('Status')}")
         print(f"Состояние: {camp.get('State')}")
+        print(f"Статус оплаты: {camp.get('StatusPayment', 'N/A')}")
         print(f"Дата старта: {camp.get('StartDate', 'N/A')}")
         
         budget = camp.get('DailyBudget')

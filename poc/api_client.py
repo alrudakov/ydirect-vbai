@@ -170,23 +170,26 @@ class DirectAPIClient:
         # Бюджет в микроединицах (1 руб = 1_000_000 микроединиц)
         budget_micros = daily_budget_rub * 1_000_000
         
+        # Недельный бюджет = дневной * 7
+        weekly_budget_micros = budget_micros * 7
+        
         campaign_data = {
             "Name": name,
             "StartDate": start_date,
-            "DailyBudget": {
-                "Amount": budget_micros,
-                "Mode": "STANDARD"
-            },
             "NegativeKeywords": {
                 "Items": negative_keywords or []
             },
             "TextCampaign": {
                 "BiddingStrategy": {
                     "Search": {
-                        "BiddingStrategyType": "HIGHEST_POSITION"
+                        "BiddingStrategyType": "WB_MAXIMUM_CLICKS",
+                        "WbMaximumClicks": {
+                            "WeeklySpendLimit": weekly_budget_micros,
+                            "BidCeiling": 50000000  # 50 руб макс за клик
+                        }
                     },
                     "Network": {
-                        "BiddingStrategyType": "MAXIMUM_COVERAGE"
+                        "BiddingStrategyType": "NETWORK_DEFAULT"
                     }
                 },
                 "Settings": [

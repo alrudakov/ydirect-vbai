@@ -1,0 +1,33 @@
+18:22:01 | INFO     | 📄 Лог: logs\campaign_20260122_182201.log
+18:22:01 | INFO     | 📋 Конфиг загружен: config/execai_it_campaign.json
+18:22:01 | INFO     | 🚀 Режим PRODUCTION
+18:22:01 | INFO     | 📢 Создаю кампанию: ExecAI - DevOps IT
+18:22:01 | INFO     |    Бюджет: 1000 руб/день
+18:22:01 | INFO     |    Старт: 2026-01-23
+18:22:01 | DEBUG    | → campaigns.add
+18:22:01 | DEBUG    | Starting new HTTPS connection (1): api.direct.yandex.com:443
+18:22:04 | DEBUG    | https://api.direct.yandex.com:443 "POST /json/v5/campaigns HTTP/1.1" 200 44
+18:22:04 | DEBUG    | ← OK
+18:22:04 | INFO     | ✅ Кампания создана! ID: 706552117
+18:22:04 | INFO     | 📁 Создаю группу объявлений: DevOps + SRE
+18:22:04 | DEBUG    | → adgroups.add
+18:22:04 | DEBUG    | Starting new HTTPS connection (1): api.direct.yandex.com:443
+18:22:06 | DEBUG    | https://api.direct.yandex.com:443 "POST /json/v5/adgroups HTTP/1.1" 200 45
+18:22:06 | DEBUG    | ← OK
+18:22:06 | INFO     | ✅ Группа создана! ID: 5704219166
+18:22:06 | INFO     | 🔑 Добавляю 10 ключевых слов
+18:22:06 | DEBUG    | → keywords.add
+18:22:06 | DEBUG    | Starting new HTTPS connection (1): api.direct.yandex.com:443
+18:22:08 | DEBUG    | https://api.direct.yandex.com:443 "POST /json/v5/keywords HTTP/1.1" 200 2577
+18:22:08 | DEBUG    | ← OK
+18:22:08 | INFO     | ✅ Добавлено ключей: 10
+18:22:08 | INFO     | 🖼️ Загружаю изображение: 1.jpg (49.1 КБ)
+18:22:08 | DEBUG    | → adimages.add
+18:22:08 | DEBUG    | Starting new HTTPS connection (1): api.direct.yandex.com:443
+18:22:09 | DEBUG    | https://api.direct.yandex.com:443 "POST /json/v5/adimages HTTP/1.1" 200 None
+18:22:09 | DEBUG    | ← OK
+18:22:09 | ERROR    |   ❌ Ошибка: Неверный формат
+18:22:09 | INFO     | 🎬 Загружаю видео: 1.mp4 (4.8 МБ)
+18:22:09 | INFO     |    (это может занять время...)
+18:22:09 | DEBUG    | → advideos.add
+18:22:09 | DEBUG    | Starting new HTTPS connection (1): api.direct.yandex.com:443

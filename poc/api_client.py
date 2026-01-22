@@ -1,9 +1,16 @@
 """
 Яндекс Директ API v5 Client
 https://yandex.ru/dev/direct/doc/ru/concepts/overview
+
+Исправлено по официальной документации:
+- AdImages.add: https://yandex.ru/dev/direct/doc/ru/adimages/add
+- Ads.add (TextAd, TextImageAd): https://yandex.ru/dev/direct/doc/ru/ads/add
+- AdVideos.add: https://yandex.ru/dev/direct/doc/ru/advideos/add
+- Creatives.add: https://yandex.ru/dev/direct/doc/en/creatives/add
 """
 import requests
 import json
+import base64
 import logging
 from typing import Optional, List, Dict, Any
 from pathlib import Path
@@ -23,8 +30,6 @@ class DirectAPIError(Exception):
 class DirectAPIClient:
     """
     Клиент для Яндекс Директ API v5
-    
-    Docs: https://yandex.ru/dev/direct/doc/ru/concepts/overview
     """
     
     BASE_URL = "https://api.direct.yandex.com/json/v5"
@@ -63,7 +68,7 @@ class DirectAPIClient:
         Базовый вызов API
         
         Args:
-            service: Сервис API (campaigns, adgroups, ads, keywords)
+            service: Сервис API (campaigns, adgroups, ads, keywords, adimages, advideos, creatives)
             method: Метод (add, get, update, delete)
             params: Параметры запроса
         """
@@ -75,13 +80,12 @@ class DirectAPIClient:
         }
         
         logger.debug(f"→ {service}.{method}")
-        logger.debug(f"  Body: {json.dumps(body, ensure_ascii=False)[:500]}")
         
         response = requests.post(
             url,
             headers=self._headers(),
             json=body,
-            timeout=60
+            timeout=120  # Увеличил для загрузки файлов
         )
         
         result = response.json()
@@ -97,6 +101,28 @@ class DirectAPIClient:
         
         logger.debug(f"← OK")
         return result.get("result", {})
+    
+    def _check_add_result(self, result: Dict, entity_name: str = "объект") -> Any:
+        """Проверяет результат add-метода и возвращает ID/Hash"""
+        add_results = result.get("AddResults", [])
+        if not add_results:
+            raise DirectAPIError(0, "Пустой ответ", "AddResults empty")
+        
+        first = add_results[0]
+        if "Errors" in first and first["Errors"]:
+            err = first["Errors"][0]
+            raise DirectAPIError(
+                err.get("Code", 0),
+                err.get("Message", "Unknown error"),
+                err.get("Details", "")
+            )
+        
+        # Warnings логируем но не фейлим
+        if "Warnings" in first and first["Warnings"]:
+            for w in first["Warnings"]:
+                logger.warning(f"⚠️ {w.get('Message', '')}")
+        
+        return first
     
     # =========== CAMPAIGNS ===========
     
@@ -149,12 +175,11 @@ class DirectAPIClient:
             "StartDate": start_date,
             "DailyBudget": {
                 "Amount": budget_micros,
-                "Mode": "STANDARD"  # или DISTRIBUTED
+                "Mode": "STANDARD"
             },
             "NegativeKeywords": {
                 "Items": negative_keywords or []
             },
-            # Текстовая кампания (классика)
             "TextCampaign": {
                 "BiddingStrategy": {
                     "Search": {
@@ -182,19 +207,7 @@ class DirectAPIClient:
             "Campaigns": [campaign_data]
         })
         
-        add_results = result.get("AddResults", [])
-        if not add_results:
-            raise DirectAPIError(0, "Пустой ответ", "AddResults empty")
-        
-        first = add_results[0]
-        if "Errors" in first:
-            err = first["Errors"][0]
-            raise DirectAPIError(
-                err.get("Code", 0),
-                err.get("Message", "Unknown"),
-                err.get("Details", "")
-            )
-        
+        first = self._check_add_result(result, "кампания")
         campaign_id = first["Id"]
         logger.info(f"✅ Кампания создана! ID: {campaign_id}")
         return campaign_id
@@ -225,71 +238,295 @@ class DirectAPIClient:
             "AdGroups": [group_data]
         })
         
-        add_results = result.get("AddResults", [])
-        if not add_results:
-            raise DirectAPIError(0, "Пустой ответ", "AddResults empty")
-        
-        first = add_results[0]
-        if "Errors" in first:
-            err = first["Errors"][0]
-            raise DirectAPIError(err.get("Code", 0), err.get("Message", ""))
-        
+        first = self._check_add_result(result, "группа")
         group_id = first["Id"]
         logger.info(f"✅ Группа создана! ID: {group_id}")
         return group_id
     
+    # =========== AD IMAGES ===========
+    # Docs: https://yandex.ru/dev/direct/doc/ru/adimages/add
+    
+    def upload_image(self, image_path: str, name: str = None) -> str:
+        """
+        Загрузить изображение в библиотеку (AdImages.add)
+        
+        Args:
+            image_path: Путь к файлу (jpg/png/gif)
+            name: Название изображения (обязательно, до 255 символов)
+        
+        Returns:
+            AdImageHash для использования в объявлениях
+        
+        Ограничения:
+            - Форматы: JPG, PNG, GIF
+            - Для графических объявлений: до 512 КБ
+            - Для остальных: до 10 МБ
+            - Разрешение: от 450px до 5000px (зависит от соотношения сторон)
+        """
+        file_path = Path(image_path)
+        if not file_path.exists():
+            raise FileNotFoundError(f"Изображение не найдено: {image_path}")
+        
+        # Проверка размера (10 МБ макс)
+        file_size = file_path.stat().st_size
+        if file_size > 10 * 1024 * 1024:
+            raise ValueError(f"Файл слишком большой: {file_size / 1024 / 1024:.1f} МБ (макс 10 МБ)")
+        
+        # Читаем и кодируем в base64
+        with open(file_path, "rb") as f:
+            image_data = base64.b64encode(f.read()).decode("utf-8")
+        
+        image_name = (name or file_path.stem)[:255]
+        
+        logger.info(f"🖼️ Загружаю изображение: {file_path.name} ({file_size / 1024:.1f} КБ)")
+        
+        # Официальный формат запроса
+        result = self._call("adimages", "add", {
+            "AdImages": [{
+                "ImageData": image_data,
+                "Type": "AUTO",  # Автоопределение типа
+                "Name": image_name
+            }]
+        })
+        
+        first = self._check_add_result(result, "изображение")
+        image_hash = first.get("AdImageHash")
+        
+        if not image_hash:
+            raise DirectAPIError(0, "AdImageHash не получен", str(first))
+        
+        logger.info(f"✅ Изображение загружено! Hash: {image_hash}")
+        return image_hash
+    
+    def get_images(self) -> List[Dict]:
+        """Получить список загруженных изображений"""
+        result = self._call("adimages", "get", {
+            "FieldNames": ["AdImageHash", "Name", "Type", "Subtype", "OriginalUrl"]
+        })
+        return result.get("AdImages", [])
+    
+    # =========== AD VIDEOS ===========
+    # Docs: https://yandex.ru/dev/direct/doc/ru/advideos/add
+    
+    def upload_video_by_url(self, video_url: str) -> str:
+        """
+        Загрузить видео по URL (AdVideos.add)
+        
+        Args:
+            video_url: Прямая ссылка на видеофайл
+        
+        Returns:
+            VideoId для создания креатива
+        
+        Ограничения:
+            - Форматы: MP4, WebM, MOV, QT, FLV, AVI
+            - Размер: до 100 МБ
+            - Длительность: 5-60 сек
+            - Разрешение: мин 360p, рек 1080p
+        """
+        logger.info(f"🎬 Загружаю видео по URL: {video_url[:50]}...")
+        
+        result = self._call("advideos", "add", {
+            "AdVideos": [{
+                "Url": video_url
+            }]
+        })
+        
+        first = self._check_add_result(result, "видео")
+        video_id = first.get("Id")
+        
+        if not video_id:
+            raise DirectAPIError(0, "VideoId не получен", str(first))
+        
+        logger.info(f"✅ Видео загружено! ID: {video_id}")
+        return video_id
+    
+    def upload_video_binary(self, video_path: str, name: str = None) -> str:
+        """
+        Загрузить видео файлом (AdVideos.add с VideoData)
+        
+        Args:
+            video_path: Путь к видеофайлу
+            name: Название видео
+        
+        Returns:
+            VideoId для создания креатива
+        
+        Ограничение: только 1 видео за вызов в бинарном режиме
+        """
+        file_path = Path(video_path)
+        if not file_path.exists():
+            raise FileNotFoundError(f"Видео не найдено: {video_path}")
+        
+        # Проверка размера (100 МБ макс)
+        file_size = file_path.stat().st_size
+        if file_size > 100 * 1024 * 1024:
+            raise ValueError(f"Видео слишком большое: {file_size / 1024 / 1024:.1f} МБ (макс 100 МБ)")
+        
+        logger.info(f"🎬 Загружаю видео: {file_path.name} ({file_size / 1024 / 1024:.1f} МБ)")
+        logger.info("   (это может занять время...)")
+        
+        # Читаем и кодируем в base64
+        with open(file_path, "rb") as f:
+            video_data = base64.b64encode(f.read()).decode("utf-8")
+        
+        video_name = (name or file_path.stem)[:255]
+        
+        result = self._call("advideos", "add", {
+            "AdVideos": [{
+                "VideoData": video_data,
+                "Name": video_name
+            }]
+        })
+        
+        first = self._check_add_result(result, "видео")
+        video_id = first.get("Id")
+        
+        if not video_id:
+            raise DirectAPIError(0, "VideoId не получен", str(first))
+        
+        logger.info(f"✅ Видео загружено! ID: {video_id}")
+        return video_id
+    
+    # =========== CREATIVES ===========
+    # Docs: https://yandex.ru/dev/direct/doc/en/creatives/add
+    
+    def create_video_extension_creative(self, video_id: str) -> int:
+        """
+        Создать креатив для видеодополнения (Creatives.add)
+        
+        Args:
+            video_id: ID видео из AdVideos.add
+        
+        Returns:
+            CreativeId для привязки к объявлению
+        """
+        logger.info(f"🎞️ Создаю креатив для видео ID: {video_id}")
+        
+        result = self._call("creatives", "add", {
+            "Creatives": [{
+                "VideoExtensionCreative": {
+                    "VideoId": video_id
+                }
+            }]
+        })
+        
+        first = self._check_add_result(result, "креатив")
+        creative_id = first.get("Id")
+        
+        if not creative_id:
+            raise DirectAPIError(0, "CreativeId не получен", str(first))
+        
+        logger.info(f"✅ Креатив создан! ID: {creative_id}")
+        return creative_id
+    
     # =========== ADS ===========
+    # Docs: https://yandex.ru/dev/direct/doc/ru/ads/add
     
     def create_text_ad(self,
                        ad_group_id: int,
                        title: str,
-                       title2: str,
                        text: str,
                        href: str,
-                       display_url: Optional[str] = None) -> int:
+                       title2: Optional[str] = None,
+                       display_url: Optional[str] = None,
+                       image_hash: Optional[str] = None,
+                       video_creative_id: Optional[int] = None) -> int:
         """
-        Создать текстовое объявление
+        Создать текстово-графическое объявление (TextAd)
         
         Args:
             ad_group_id: ID группы объявлений
-            title: Заголовок 1 (до 35 символов)
-            title2: Заголовок 2 (до 30 символов)
-            text: Текст объявления (до 81 символа)
+            title: Заголовок 1 (обязательный, до 56 символов)
+            text: Текст объявления (обязательный, до 81 символа)
             href: Ссылка на сайт
+            title2: Заголовок 2 (до 30 символов)
             display_url: Отображаемая ссылка
+            image_hash: AdImageHash для картинки (типы REGULAR или WIDE)
+            video_creative_id: CreativeId для видеодополнения
+        
+        Returns:
+            ID созданного объявления
         """
-        ad_data = {
-            "AdGroupId": ad_group_id,
-            "TextAd": {
-                "Title": title[:35],
-                "Title2": title2[:30] if title2 else None,
-                "Text": text[:81],
-                "Href": href,
-                "DisplayUrlPath": display_url,
-                "Mobile": "NO"
-            }
+        # Обрезаем по лимитам
+        title = title[:56]
+        text = text[:81]
+        if title2:
+            title2 = title2[:30]
+        
+        # Формируем TextAd по официальной структуре
+        text_ad = {
+            "Title": title,
+            "Text": text,
+            "Href": href,
+            "Mobile": "NO"  # Обязательное поле (устаревшее, но required)
         }
         
-        # Убираем None значения
-        ad_data["TextAd"] = {k: v for k, v in ad_data["TextAd"].items() if v is not None}
+        if title2:
+            text_ad["Title2"] = title2
+        if display_url:
+            text_ad["DisplayUrlPath"] = display_url
+        if image_hash:
+            text_ad["AdImageHash"] = image_hash
+        if video_creative_id:
+            text_ad["VideoExtension"] = {"CreativeId": video_creative_id}
+        
+        ad_data = {
+            "AdGroupId": ad_group_id,
+            "TextAd": text_ad
+        }
         
         logger.info(f"📝 Создаю объявление: {title[:30]}...")
+        if image_hash:
+            logger.info(f"   + картинка: {image_hash[:20]}...")
+        if video_creative_id:
+            logger.info(f"   + видео: {video_creative_id}")
         
         result = self._call("ads", "add", {
             "Ads": [ad_data]
         })
         
-        add_results = result.get("AddResults", [])
-        if not add_results:
-            raise DirectAPIError(0, "Пустой ответ", "AddResults empty")
-        
-        first = add_results[0]
-        if "Errors" in first:
-            err = first["Errors"][0]
-            raise DirectAPIError(err.get("Code", 0), err.get("Message", ""))
-        
+        first = self._check_add_result(result, "объявление")
         ad_id = first["Id"]
         logger.info(f"✅ Объявление создано! ID: {ad_id}")
+        return ad_id
+    
+    def create_text_image_ad(self,
+                             ad_group_id: int,
+                             image_hash: str,
+                             href: str) -> int:
+        """
+        Создать графическое объявление (TextImageAd)
+        
+        Это объявление где основа — картинка (баннер).
+        Подходят только изображения типа FIXED_IMAGE.
+        
+        Args:
+            ad_group_id: ID группы объявлений
+            image_hash: AdImageHash (обязательный, тип FIXED_IMAGE)
+            href: Ссылка на сайт
+        
+        Returns:
+            ID созданного объявления
+        """
+        ad_data = {
+            "AdGroupId": ad_group_id,
+            "TextImageAd": {
+                "AdImageHash": image_hash,
+                "Href": href
+            }
+        }
+        
+        logger.info(f"📝 Создаю графическое объявление...")
+        logger.info(f"   Hash: {image_hash[:20]}...")
+        
+        result = self._call("ads", "add", {
+            "Ads": [ad_data]
+        })
+        
+        first = self._check_add_result(result, "объявление")
+        ad_id = first["Id"]
+        logger.info(f"✅ Графическое объявление создано! ID: {ad_id}")
         return ad_id
     
     # =========== KEYWORDS ===========
@@ -326,143 +563,12 @@ class DirectAPIClient:
         for r in result.get("AddResults", []):
             if "Id" in r:
                 keyword_ids.append(r["Id"])
-            elif "Errors" in r:
+            elif "Errors" in r and r["Errors"]:
                 err = r["Errors"][0]
                 logger.warning(f"⚠️ Ключ не добавлен: {err.get('Message')}")
         
         logger.info(f"✅ Добавлено ключей: {len(keyword_ids)}")
         return keyword_ids
-    
-    # =========== IMAGES ===========
-    
-    def upload_image(self, image_path: str, name: str = None) -> str:
-        """
-        Загрузить изображение в библиотеку
-        
-        Args:
-            image_path: Путь к файлу (jpg/png)
-            name: Название изображения
-        
-        Returns:
-            ImageHash для использования в объявлениях
-        """
-        import base64
-        
-        file_path = Path(image_path)
-        if not file_path.exists():
-            raise FileNotFoundError(f"Изображение не найдено: {image_path}")
-        
-        # Читаем и кодируем в base64
-        with open(file_path, "rb") as f:
-            image_data = base64.b64encode(f.read()).decode("utf-8")
-        
-        image_name = name or file_path.stem
-        
-        logger.info(f"🖼️ Загружаю изображение: {file_path.name}")
-        
-        result = self._call("adimages", "add", {
-            "AdImages": [{
-                "Name": image_name[:255],
-                "ImageData": image_data
-            }]
-        })
-        
-        add_results = result.get("AddResults", [])
-        if not add_results:
-            raise DirectAPIError(0, "Пустой ответ", "AddResults empty")
-        
-        first = add_results[0]
-        if "Errors" in first:
-            err = first["Errors"][0]
-            raise DirectAPIError(err.get("Code", 0), err.get("Message", ""))
-        
-        image_hash = first.get("AdImageHash")
-        logger.info(f"✅ Изображение загружено! Hash: {image_hash}")
-        return image_hash
-    
-    def get_images(self) -> List[Dict]:
-        """Получить список загруженных изображений"""
-        result = self._call("adimages", "get", {
-            "FieldNames": ["AdImageHash", "Name", "Type", "Subtype"]
-        })
-        return result.get("AdImages", [])
-    
-    # =========== TEXT AD WITH IMAGE ===========
-    
-    def create_text_image_ad(self,
-                             ad_group_id: int,
-                             title: str,
-                             title2: str,
-                             text: str,
-                             href: str,
-                             image_hash: str,
-                             display_url: Optional[str] = None) -> int:
-        """
-        Создать текстово-графическое объявление (с картинкой)
-        
-        Args:
-            ad_group_id: ID группы объявлений
-            title: Заголовок 1
-            title2: Заголовок 2
-            text: Текст объявления
-            href: Ссылка
-            image_hash: Hash изображения из upload_image()
-            display_url: Отображаемая ссылка
-        """
-        ad_data = {
-            "AdGroupId": ad_group_id,
-            "TextImageAd": {
-                "Title": title[:33],
-                "Text": text[:75],
-                "Href": href,
-                "AdImageHash": image_hash,
-                "DisplayUrlPath": display_url
-            }
-        }
-        
-        # Убираем None
-        ad_data["TextImageAd"] = {k: v for k, v in ad_data["TextImageAd"].items() if v is not None}
-        
-        logger.info(f"📝 Создаю текстово-графическое объявление: {title[:30]}...")
-        
-        result = self._call("ads", "add", {
-            "Ads": [ad_data]
-        })
-        
-        add_results = result.get("AddResults", [])
-        if not add_results:
-            raise DirectAPIError(0, "Пустой ответ", "AddResults empty")
-        
-        first = add_results[0]
-        if "Errors" in first:
-            err = first["Errors"][0]
-            raise DirectAPIError(err.get("Code", 0), err.get("Message", ""))
-        
-        ad_id = first["Id"]
-        logger.info(f"✅ Объявление с картинкой создано! ID: {ad_id}")
-        return ad_id
-    
-    # =========== VIDEO EXTENSION ===========
-    
-    def add_video_extension(self, ad_id: int, video_url: str) -> bool:
-        """
-        Добавить видеодополнение к объявлению
-        
-        Note: Видео должно быть предварительно загружено на YouTube 
-        или в Видеоконструктор Яндекса
-        
-        Args:
-            ad_id: ID объявления
-            video_url: URL видео
-        """
-        logger.info(f"🎬 Добавляю видеодополнение к объявлению {ad_id}")
-        
-        # Видеодополнения добавляются через update объявления
-        # или через отдельный сервис VideoExtensions
-        
-        # TODO: Реализовать когда будет понятен точный формат
-        logger.warning("⚠️ Видеодополнения через API требуют предзагрузки в Видеоконструктор")
-        return False
     
     # =========== MODERATION ===========
     
@@ -503,4 +609,13 @@ if __name__ == "__main__":
             print(f"      Статус: {c['Status']} | Состояние: {c['State']}")
             print(f"      Бюджет: {budget:.0f} руб/день")
             print()
-
+    
+    print("\n🖼️ Загруженные изображения:")
+    print("-" * 50)
+    
+    images = client.get_images()
+    if not images:
+        print("Изображений нет")
+    else:
+        for img in images[:10]:
+            print(f"  [{img.get('AdImageHash', 'N/A')[:15]}...] {img.get('Name')} ({img.get('Type')})")

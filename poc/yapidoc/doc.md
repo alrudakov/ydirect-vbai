@@ -181,3 +181,53 @@ POST на JSON-эндпоинт сервиса Ads:
 
 [1]: https://yandex.com/dev/direct/doc/en/ads/moderate "moderate | Yandex Direct API"
 [2]: https://yandex.com/dev/direct/doc/en/ads/ads?utm_source=chatgpt.com "Ads | Yandex Direct API"
+
+
+По `BidModifiers.get` **`SelectionCriteria.Levels` обязателен** и допустимые значения там ровно два: **`CAMPAIGN`** и **`AD_GROUP`**. ([Yandex][1])
+
+### Какие значения Levels допустимы
+
+* `CAMPAIGN` (корректировки, заданные на уровне кампаний)
+* `AD_GROUP` (корректировки, заданные на уровне групп объявлений) ([Yandex][1])
+
+Можно передать **оба** в массиве, если хочешь получить корректировки и по кампаниям, и по группам. ([Yandex][1])
+
+---
+
+## JSON пример `BidModifiers.get` с обязательным `Levels`
+
+Минимально нужно:
+
+* `params.SelectionCriteria` (обязателен)
+* в нем `Levels` (обязателен)
+* плюс хотя бы один из `CampaignIds` / `AdGroupIds` / `Ids`
+* и `FieldNames` (обязателен) ([Yandex][1])
+
+Пример: получить корректировки по **кампании** и по **ее группам** (оба уровня), вывести базовые поля + значения для mobile/tablet:
+
+```json
+{
+  "method": "get",
+  "params": {
+    "SelectionCriteria": {
+      "CampaignIds": [12345678],
+      "Levels": ["CAMPAIGN", "AD_GROUP"]
+    },
+    "FieldNames": ["Id", "CampaignId", "AdGroupId", "Level", "Type"],
+    "MobileAdjustmentFieldNames": ["BidModifier", "OperatingSystemType"],
+    "TabletAdjustmentFieldNames": ["BidModifier", "OperatingSystemType"],
+    "Page": { "Limit": 10000, "Offset": 0 }
+  }
+}
+```
+
+`Levels` тут обязателен, и список значений именно `CAMPAIGN | AD_GROUP`. ([Yandex][1])
+
+---
+
+### Быстрые подсказки
+
+* Если хочешь **только кампанийные** корректировки: `Levels: ["CAMPAIGN"]`.
+* Если хочешь **только групповые**: `Levels: ["AD_GROUP"]` (и логично фильтровать `AdGroupIds`, либо `CampaignIds`, если нужно “все группы кампании”). ([Yandex][1])
+
+[1]: https://yandex.com/dev/direct/doc/en/bidmodifiers/get "get | Yandex Direct API"

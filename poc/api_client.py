@@ -618,48 +618,50 @@ if __name__ == "__main__":
 
     # =========== BID MODIFIERS ===========
     
-    def set_device_adjustments(self, campaign_id: int, desktop_only: bool = True) -> List[int]:
+    def disable_mobile_and_tablet(self, campaign_id: int) -> List[int]:
         """
-        Установить корректировки ставок по устройствам
+        Отключить мобильные и планшеты для кампании (только десктоп)
+        
+        BidModifier=0 в API = -100% в интерфейсе = полное отключение
+        Диапазон: 0..1300 (0=-100%, 100=0%, 1300=+1200%)
         
         Args:
             campaign_id: ID кампании
-            desktop_only: Если True - отключает мобильные и планшеты (-100%)
         
         Returns:
             Список ID созданных корректировок
         """
-        if not desktop_only:
-            return []
-        
-        # Корректировка -100% = полное отключение
-        # DeviceType: DESKTOP, MOBILE, TABLET, SMART_TV
+        # Два отдельных модификатора: Mobile и Tablet
         modifiers = [
             {
                 "CampaignId": campaign_id,
                 "MobileAdjustment": {
-                    "BidModifier": 0  # 0 = -100% (отключено)
+                    "BidModifier": 0  # 0 = -100% = отключено
                 }
             },
             {
                 "CampaignId": campaign_id,
                 "TabletAdjustment": {
-                    "BidModifier": 0  # 0 = -100% (отключено)
+                    "BidModifier": 0  # 0 = -100% = отключено
                 }
             }
         ]
         
         logger.info(f"📱 Отключаю мобильные и планшеты для кампании {campaign_id}")
         
-        result = self._call("bidmodifiers", "set", {
+        # Используем метод ADD для создания корректировок
+        result = self._call("bidmodifiers", "add", {
             "BidModifiers": modifiers
         })
         
         ids = []
-        for r in result.get("SetResults", []):
+        for r in result.get("AddResults", []):
             if "Id" in r:
                 ids.append(r["Id"])
-                logger.info(f"✅ Корректировка установлена: ID {r['Id']}")
+                logger.info(f"✅ Корректировка создана: ID {r['Id']}")
+            elif "Errors" in r:
+                for err in r["Errors"]:
+                    logger.warning(f"⚠️ {err.get('Message')}")
         
         return ids
     

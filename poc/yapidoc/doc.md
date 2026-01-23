@@ -135,3 +135,49 @@ JSON пример:
 [2]: https://yandex.com/dev/direct/doc/en/bidmodifiers/add "add | Yandex Direct API"
 [3]: https://mobi.yandex.com/support/direct/en/impressions/bids-adjustment?utm_source=chatgpt.com "Bid adjustments - Targeting (identify your target audience) | Yandex Direct"
 [4]: https://yandex.com/dev/direct/doc/en/campaigns/update "update | Yandex Direct API"
+
+
+
+
+
+
+### Ads.moderate (API v5): что обязательно
+
+По документации у `Ads.moderate` **обязателен `params.SelectionCriteria`**, и внутри него **обязателен `Ids`**. То есть это не “Ids или SelectionCriteria”, а **SelectionCriteria с Ids**. ([Yandex][1])
+
+---
+
+## JSON пример запроса (отправить объявления на модерацию)
+
+POST на JSON-эндпоинт сервиса Ads:
+`https://api.direct.yandex.com/json/v5/ads` (или `.../json/v501/ads`). ([Yandex][2])
+
+Тело:
+
+```json
+{
+  "method": "moderate",
+  "params": {
+    "SelectionCriteria": {
+      "Ids": [11111111, 22222222, 33333333]
+    }
+  }
+}
+```
+
+Это ровно тот формат, который приведен в доке (IdsCriteria). ([Yandex][1])
+
+---
+
+## Ограничения, из-за которых часто “не отправляется”
+
+* За один вызов: **до 10 000 объявлений**. ([Yandex][1])
+* На модерацию можно отправить только объявления со статусом **DRAFT**. ([Yandex][1])
+* Нельзя отправить, если в группе нет условий показа (ключи/аудитории/динамика), или если кампания архивная. ([Yandex][1])
+
+---
+
+Если хочешь, скину еще готовый `curl` с нужными заголовками (Authorization, Client-Login для агентского, Accept-Language), но по сути для метода в JSON главное именно структура выше.
+
+[1]: https://yandex.com/dev/direct/doc/en/ads/moderate "moderate | Yandex Direct API"
+[2]: https://yandex.com/dev/direct/doc/en/ads/ads?utm_source=chatgpt.com "Ads | Yandex Direct API"

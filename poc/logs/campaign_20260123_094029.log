@@ -1,0 +1,12 @@
+09:40:29 | INFO     | 📄 Лог: logs\campaign_20260123_094029.log
+09:40:29 | INFO     | 📋 Конфиг загружен: config/execai_it_v2.json
+09:40:29 | INFO     | 🚀 Режим PRODUCTION
+09:40:29 | INFO     | 📢 Создаю кампанию: ExecAI IT
+09:40:29 | INFO     |    Бюджет: 500 руб/день
+09:40:29 | INFO     |    Старт: 2026-01-24
+09:40:29 | DEBUG    | → campaigns.add
+09:40:29 | DEBUG    | Starting new HTTPS connection (1): api.direct.yandex.com:443
+09:40:32 | DEBUG    | https://api.direct.yandex.com:443 "POST /json/v5/campaigns HTTP/1.1" 200 44
+09:40:32 | DEBUG    | ← OK
+09:40:32 | INFO     | ✅ Кампания создана! ID: 706570098
+09:40:32 | ERROR    | ❌ Ошибка: 'DirectAPIClient' object has no attribute 'disable_mobile_and_tablet'

@@ -117,6 +117,9 @@ class CampaignCreator:
             # 1. Кампания
             self._create_campaign()
             
+            # 1.5 Отключаем мобильные/планшеты если указано
+            self._setup_device_targeting()
+            
             # 2. Группа объявлений
             self._create_ad_group()
             
@@ -163,6 +166,30 @@ class CampaignCreator:
         )
         
         self.results["campaign_id"] = campaign_id
+    
+    def _setup_device_targeting(self):
+        """Шаг 1.5: Настройка таргетинга по устройствам"""
+        targeting = self.config.get("targeting", {})
+        devices = targeting.get("devices", [])
+        
+        # Если указан только DESKTOP - отключаем мобильные и планшеты
+        if devices == ["DESKTOP"]:
+            print("\n📱 ШАГ 1.5: Отключение мобильных и планшетов")
+            print("-" * 40)
+            
+            modifier_ids = self.client.disable_mobile_and_tablet(
+                self.results["campaign_id"]
+            )
+            self.results["bid_modifier_ids"] = modifier_ids
+        
+        # Минус-площадки
+        excluded = targeting.get("excluded_placements", [])
+        if excluded:
+            print(f"\n🚫 Добавляю {len(excluded)} минус-площадок")
+            self.client.add_excluded_placements(
+                self.results["campaign_id"],
+                excluded
+            )
     
     def _create_ad_group(self):
         """Шаг 2: Создание группы объявлений"""

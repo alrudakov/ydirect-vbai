@@ -614,6 +614,87 @@ if __name__ == "__main__":
             print()
     
     print("\n🖼️ Загруженные изображения:")
+
+
+    # =========== BID MODIFIERS ===========
+    
+    def set_device_adjustments(self, campaign_id: int, desktop_only: bool = True) -> List[int]:
+        """
+        Установить корректировки ставок по устройствам
+        
+        Args:
+            campaign_id: ID кампании
+            desktop_only: Если True - отключает мобильные и планшеты (-100%)
+        
+        Returns:
+            Список ID созданных корректировок
+        """
+        if not desktop_only:
+            return []
+        
+        # Корректировка -100% = полное отключение
+        # DeviceType: DESKTOP, MOBILE, TABLET, SMART_TV
+        modifiers = [
+            {
+                "CampaignId": campaign_id,
+                "MobileAdjustment": {
+                    "BidModifier": 0  # 0 = -100% (отключено)
+                }
+            },
+            {
+                "CampaignId": campaign_id,
+                "TabletAdjustment": {
+                    "BidModifier": 0  # 0 = -100% (отключено)
+                }
+            }
+        ]
+        
+        logger.info(f"📱 Отключаю мобильные и планшеты для кампании {campaign_id}")
+        
+        result = self._call("bidmodifiers", "set", {
+            "BidModifiers": modifiers
+        })
+        
+        ids = []
+        for r in result.get("SetResults", []):
+            if "Id" in r:
+                ids.append(r["Id"])
+                logger.info(f"✅ Корректировка установлена: ID {r['Id']}")
+        
+        return ids
+    
+    def add_excluded_placements(self, campaign_id: int, placements: List[str]) -> bool:
+        """
+        Добавить минус-площадки (заблокировать сайты)
+        
+        Args:
+            campaign_id: ID кампании  
+            placements: Список площадок для блокировки
+        
+        Returns:
+            True если успешно
+        """
+        if not placements:
+            return True
+        
+        logger.info(f"🚫 Добавляю {len(placements)} минус-площадок")
+        
+        # Используем update для кампании
+        result = self._call("campaigns", "update", {
+            "Campaigns": [{
+                "Id": campaign_id,
+                "ExcludedSites": {
+                    "Items": placements
+                }
+            }]
+        })
+        
+        for r in result.get("UpdateResults", []):
+            if "Errors" not in r:
+                logger.info(f"✅ Минус-площадки добавлены")
+                return True
+        
+        return False
     print("-" * 50)
     
     images = client.get_images()

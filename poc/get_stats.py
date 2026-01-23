@@ -1,21 +1,22 @@
 """
-📊 Полная статистика кампании Яндекс Директ
-Reports API v5: https://yandex.ru/dev/direct/doc/ru/reports
+📊 Полная статистика кампании Яндекс Директ (Reports API v5)
+https://yandex.ru/dev/direct/doc/ru/reports
+
+Usage:
+  python get_stats.py --campaign-id 706570098 --days 7
+  python get_stats.py --campaign-id 706552117 --date-from 2026-01-22 --date-to 2026-01-23
 """
-import json
+
+import argparse
 import csv
-import requests
+import time
 from datetime import datetime, timedelta
 from pathlib import Path
 
-# Загружаем токен
-TOKEN = Path("token.txt").read_text().strip()
-CAMPAIGN_ID = "706552117"
-REPORT_URL = "https://api.direct.yandex.com/json/v5/reports"
+import requests
 
-# Даты
-DATE_FROM = "2026-01-22"  # Когда запустил кампанию
-DATE_TO = datetime.now().strftime("%Y-%m-%d")
+TOKEN = Path("token.txt").read_text().strip()
+REPORT_URL = "https://api.direct.yandex.com/json/v5/reports"
 
 def get_headers():
     return {
@@ -28,16 +29,27 @@ def get_headers():
         "skipReportSummary": "true"
     }
 
-def fetch_report(report_type: str, field_names: list, report_name: str, order_by: str = None) -> list:
+def fetch_report(
+    campaign_id: str,
+    date_from: str,
+    date_to: str,
+    report_type: str,
+    field_names: list,
+    report_name: str,
+    order_by: str | None = None,
+    retries: int = 12,
+    retry_sleep_s: float = 2.0,
+    timeout_s: float = 20.0,
+) -> list:
     """Получает отчёт из Reports API"""
     
     body = {
         "params": {
             "SelectionCriteria": {
-                "DateFrom": DATE_FROM,
-                "DateTo": DATE_TO,
+                "DateFrom": date_from,
+                "DateTo": date_to,
                 "Filter": [
-                    {"Field": "CampaignId", "Operator": "EQUALS", "Values": [CAMPAIGN_ID]}
+                    {"Field": "CampaignId", "Operator": "EQUALS", "Values": [campaign_id]}
                 ]
             },
             "FieldNames": field_names,
@@ -53,24 +65,44 @@ def fetch_report(report_type: str, field_names: list, report_name: str, order_by
     if order_by:
         body["params"]["OrderBy"] = [{"Field": order_by, "SortOrder": "DESCENDING"}]
     
-    resp = requests.post(REPORT_URL, headers=get_headers(), json=body)
-    
-    if resp.status_code == 200:
-        lines = resp.text.strip().split("\n")
-        if len(lines) >= 2:
-            headers = lines[0].split("\t")
-            result = []
-            for line in lines[1:]:
-                data = line.split("\t")
-                result.append(dict(zip(headers, data)))
-            return result
-    elif resp.status_code == 201 or resp.status_code == 202:
-        print(f"   ⏳ Отчёт готовится... (status {resp.status_code})")
+    for attempt in range(1, retries + 1):
+        try:
+            resp = requests.post(
+                REPORT_URL,
+                headers=get_headers(),
+                json=body,
+                timeout=timeout_s,
+            )
+        except requests.exceptions.RequestException as e:
+            if attempt == 1:
+                print(f"   ⚠️ Ошибка сети: {e} (retry...)")
+            time.sleep(retry_sleep_s)
+            continue
+
+        if resp.status_code == 200:
+            lines = resp.text.strip().split("\n")
+            if len(lines) >= 2:
+                headers = lines[0].split("\t")
+                result = []
+                for line in lines[1:]:
+                    data = line.split("\t")
+                    result.append(dict(zip(headers, data)))
+                return result
+            return []
+
+        if resp.status_code in (201, 202):
+            # Reports service просит повторить тот же запрос позже
+            retry_in = resp.headers.get("retryIn")
+            sleep_s = float(retry_in) if retry_in and retry_in.isdigit() else retry_sleep_s
+            if attempt == 1:
+                print(f"   ⏳ Отчёт готовится... (status {resp.status_code}), retryIn={retry_in or 'n/a'}")
+            time.sleep(sleep_s)
+            continue
+
+        print(f"   ❌ Ошибка {resp.status_code}: {resp.text[:300]}")
         return []
-    else:
-        print(f"   ❌ Ошибка {resp.status_code}: {resp.text[:200]}")
-        return []
-    
+
+    print("   ❌ Таймаут ожидания отчёта (слишком долго готовится)")
     return []
 
 
@@ -81,11 +113,26 @@ def print_section(title: str):
 
 
 def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--campaign-id", required=True, help="ID кампании")
+    parser.add_argument("--date-from", default=None, help="YYYY-MM-DD")
+    parser.add_argument("--date-to", default=None, help="YYYY-MM-DD")
+    parser.add_argument("--days", type=int, default=2, help="Период в днях назад (если date-from/date-to не заданы)")
+    args = parser.parse_args()
+
+    campaign_id = str(args.campaign_id).strip()
+
+    date_to = args.date_to or datetime.now().strftime("%Y-%m-%d")
+    if args.date_from:
+        date_from = args.date_from
+    else:
+        date_from = (datetime.now() - timedelta(days=max(1, args.days))).strftime("%Y-%m-%d")
+
     print("╔════════════════════════════════════════════════════════════╗")
-    print("║        📈 СТАТИСТИКА КАМПАНИИ EXECAI - DEVOPS IT           ║")
+    print("║              📈 СТАТИСТИКА КАМПАНИИ Я.ДИРЕКТ               ║")
     print("╠════════════════════════════════════════════════════════════╣")
-    print(f"║  Campaign ID: {CAMPAIGN_ID}                              ║")
-    print(f"║  Период: {DATE_FROM} — {DATE_TO}                       ║")
+    print(f"║  Campaign ID: {campaign_id:<42}║")
+    print(f"║  Период: {date_from} — {date_to:<30}║")
     print("╚════════════════════════════════════════════════════════════╝")
     
     all_data = {}
@@ -95,11 +142,18 @@ def main():
     # ═══════════════════════════════════════════════════════════════════
     print_section("ОБЩАЯ СТАТИСТИКА")
     
-    data = fetch_report(
-        "CAMPAIGN_PERFORMANCE_REPORT",
-        ["Impressions", "Clicks", "Ctr", "AvgCpc", "Cost"],
-        "Total"
-    )
+    try:
+        data = fetch_report(
+            campaign_id,
+            date_from,
+            date_to,
+            "CAMPAIGN_PERFORMANCE_REPORT",
+            ["Impressions", "Clicks", "Ctr", "AvgCpc", "Cost"],
+            "Total",
+        )
+    except KeyboardInterrupt:
+        print("\n   ⚠️ Прервано пользователем")
+        return
     
     if data:
         row = data[0]
@@ -123,12 +177,19 @@ def main():
     # ═══════════════════════════════════════════════════════════════════
     print_section("ПО ДНЯМ")
     
-    data = fetch_report(
-        "CAMPAIGN_PERFORMANCE_REPORT",
-        ["Date", "Impressions", "Clicks", "Ctr", "AvgCpc", "Cost"],
-        "Daily",
-        "Date"
-    )
+    try:
+        data = fetch_report(
+            campaign_id,
+            date_from,
+            date_to,
+            "CAMPAIGN_PERFORMANCE_REPORT",
+            ["Date", "Impressions", "Clicks", "Ctr", "AvgCpc", "Cost"],
+            "Daily",
+            "Date",
+        )
+    except KeyboardInterrupt:
+        print("\n   ⚠️ Прервано пользователем")
+        return
     
     if data:
         # Сортируем по дате
@@ -154,12 +215,19 @@ def main():
     # ═══════════════════════════════════════════════════════════════════
     print_section("ПО УСТРОЙСТВАМ")
     
-    data = fetch_report(
-        "CAMPAIGN_PERFORMANCE_REPORT",
-        ["Device", "Impressions", "Clicks", "Ctr", "AvgCpc", "Cost"],
-        "Device",
-        "Cost"
-    )
+    try:
+        data = fetch_report(
+            campaign_id,
+            date_from,
+            date_to,
+            "CAMPAIGN_PERFORMANCE_REPORT",
+            ["Device", "Impressions", "Clicks", "Ctr", "AvgCpc", "Cost"],
+            "Device",
+            "Cost",
+        )
+    except KeyboardInterrupt:
+        print("\n   ⚠️ Прервано пользователем")
+        return
     
     if data:
         device_names = {
@@ -184,12 +252,19 @@ def main():
     # ═══════════════════════════════════════════════════════════════════
     print_section("ПО КЛЮЧЕВЫМ СЛОВАМ (TOP-15)")
     
-    data = fetch_report(
-        "CRITERIA_PERFORMANCE_REPORT",
-        ["Criterion", "CriteriaType", "Impressions", "Clicks", "Ctr", "AvgCpc", "Cost"],
-        "Keywords",
-        "Cost"
-    )
+    try:
+        data = fetch_report(
+            campaign_id,
+            date_from,
+            date_to,
+            "CRITERIA_PERFORMANCE_REPORT",
+            ["Criterion", "CriteriaType", "Impressions", "Clicks", "Ctr", "AvgCpc", "Cost"],
+            "Keywords",
+            "Cost",
+        )
+    except KeyboardInterrupt:
+        print("\n   ⚠️ Прервано пользователем")
+        return
     
     if data:
         # Только ключевики, топ-15 по расходу
@@ -212,12 +287,19 @@ def main():
     # ═══════════════════════════════════════════════════════════════════
     print_section("ПО РЕГИОНАМ (TOP-10)")
     
-    data = fetch_report(
-        "CAMPAIGN_PERFORMANCE_REPORT",
-        ["LocationOfPresenceName", "Impressions", "Clicks", "Ctr", "Cost"],
-        "Regions",
-        "Cost"
-    )
+    try:
+        data = fetch_report(
+            campaign_id,
+            date_from,
+            date_to,
+            "CAMPAIGN_PERFORMANCE_REPORT",
+            ["LocationOfPresenceName", "Impressions", "Clicks", "Ctr", "Cost"],
+            "Regions",
+            "Cost",
+        )
+    except KeyboardInterrupt:
+        print("\n   ⚠️ Прервано пользователем")
+        return
     
     if data:
         for i, row in enumerate(data[:10], 1):
@@ -235,12 +317,19 @@ def main():
     # ═══════════════════════════════════════════════════════════════════
     print_section("ПО ПЛОЩАДКАМ РСЯ (TOP-15)")
     
-    data = fetch_report(
-        "CAMPAIGN_PERFORMANCE_REPORT",
-        ["AdNetworkType", "Placement", "Impressions", "Clicks", "Ctr", "Cost"],
-        "Placements",
-        "Cost"
-    )
+    try:
+        data = fetch_report(
+            campaign_id,
+            date_from,
+            date_to,
+            "CAMPAIGN_PERFORMANCE_REPORT",
+            ["AdNetworkType", "Placement", "Impressions", "Clicks", "Ctr", "Cost"],
+            "Placements",
+            "Cost",
+        )
+    except KeyboardInterrupt:
+        print("\n   ⚠️ Прервано пользователем")
+        return
     
     if data:
         # Только РСЯ (AD_NETWORK)
@@ -263,12 +352,19 @@ def main():
     # ═══════════════════════════════════════════════════════════════════
     print_section("ПОИСКОВЫЕ ЗАПРОСЫ (TOP-15)")
     
-    data = fetch_report(
-        "SEARCH_QUERY_PERFORMANCE_REPORT",
-        ["Query", "Impressions", "Clicks", "Ctr", "Cost"],
-        "SearchQueries",
-        "Cost"
-    )
+    try:
+        data = fetch_report(
+            campaign_id,
+            date_from,
+            date_to,
+            "SEARCH_QUERY_PERFORMANCE_REPORT",
+            ["Query", "Impressions", "Clicks", "Ctr", "Cost"],
+            "SearchQueries",
+            "Cost",
+        )
+    except KeyboardInterrupt:
+        print("\n   ⚠️ Прервано пользователем")
+        return
     
     if data:
         for i, row in enumerate(data[:15], 1):

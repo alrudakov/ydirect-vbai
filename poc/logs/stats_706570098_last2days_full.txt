@@ -1,0 +1,80 @@
+╔════════════════════════════════════════════════════════════╗
+║              📈 СТАТИСТИКА КАМПАНИИ Я.ДИРЕКТ               ║
+╠════════════════════════════════════════════════════════════╣
+║  Campaign ID: 706570098                                 ║
+║  Период: 2026-01-21 — 2026-01-23                    ║
+╚════════════════════════════════════════════════════════════╝
+
+============================================================
+📊 ОБЩАЯ СТАТИСТИКА
+============================================================
+
+   👁️  Показы:         21,835
+   🖱️  Клики:          101
+   📈 CTR:            0.46%
+   💰 Расход:         281.72 руб
+   💵 Ср. цена клика: 2.79 руб
+
+
+============================================================
+📊 ПО ДНЯМ
+============================================================
+   Дата           Показы   Клики     CTR      CPC     Расход
+   ------------------------------------------------------
+   2026-01-23      21836     101   0.46%    2.79р    281.72р
+
+============================================================
+📊 ПО УСТРОЙСТВАМ
+============================================================
+Traceback (most recent call last):
+  File "C:\Users\fatal\Desktop\Projects\ydirect-vbai\poc\get_stats.py", line 364, in <module>
+    main()
+  File "C:\Users\fatal\Desktop\Projects\ydirect-vbai\poc\get_stats.py", line 198, in main
+    data = fetch_report(
+           ^^^^^^^^^^^^^
+  File "C:\Users\fatal\Desktop\Projects\ydirect-vbai\poc\get_stats.py", line 68, in fetch_report
+    resp = requests.post(REPORT_URL, headers=get_headers(), json=body, timeout=60)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Python\Lib\site-packages\requests\api.py", line 115, in post
+    return request("post", url, data=data, json=json, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Python\Lib\site-packages\requests\api.py", line 59, in request
+    return session.request(method=method, url=url, **kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Python\Lib\site-packages\requests\sessions.py", line 589, in request
+    resp = self.send(prep, **send_kwargs)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Python\Lib\site-packages\requests\sessions.py", line 703, in send
+    r = adapter.send(request, **kwargs)
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Python\Lib\site-packages\requests\adapters.py", line 486, in send
+    resp = conn.urlopen(
+           ^^^^^^^^^^^^^
+  File "C:\Python\Lib\site-packages\urllib3\connectionpool.py", line 714, in urlopen
+    httplib_response = self._make_request(
+                       ^^^^^^^^^^^^^^^^^^^
+  File "C:\Python\Lib\site-packages\urllib3\connectionpool.py", line 466, in _make_request
+    six.raise_from(e, None)
+  File "<string>", line 3, in raise_from
+  File "C:\Python\Lib\site-packages\urllib3\connectionpool.py", line 461, in _make_request
+    httplib_response = conn.getresponse()
+                       ^^^^^^^^^^^^^^^^^^
+  File "C:\Python\Lib\http\client.py", line 1378, in getresponse
+    response.begin()
+  File "C:\Python\Lib\http\client.py", line 318, in begin
+    version, status, reason = self._read_status()
+                              ^^^^^^^^^^^^^^^^^^^
+  File "C:\Python\Lib\http\client.py", line 279, in _read_status
+    line = str(self.fp.readline(_MAXLINE + 1), "iso-8859-1")
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Python\Lib\socket.py", line 706, in readinto
+    return self._sock.recv_into(b)
+           ^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Python\Lib\ssl.py", line 1278, in recv_into
+    return self.read(nbytes, buffer)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Python\Lib\ssl.py", line 1134, in read
+    return self._sslobj.read(len, buffer)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+KeyboardInterrupt
+^C

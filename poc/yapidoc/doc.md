@@ -3663,3 +3663,205 @@ array of ExceptionNotification
         ]
       }
     }
+
+
+
+
+
+
+
+
+
+
+
+
+    Ниже именно про **Reports v5**: как подтянуть **Метрику (sessions + цели/конверсии)**, какие **ReportType** это умеют, что такое **Goals / AttributionModels**, какие **предусловия** нужны, и 2 JSON-примера (CAMPAIGN + AD) с конверсиями.
+
+---
+
+## 1) Какие ReportType поддерживают Sessions / Conversions / ConversionRate / CostPerConversion
+
+По списку допустимых полей в Reports:
+
+* **Conversions / ConversionRate / CostPerConversion**: доступны во **всех** типах отчетов Reports (ACCOUNT, AD, ADGROUP, CAMPAIGN, CRITERIA, CUSTOM, REACH_AND_FREQUENCY, SEARCH_QUERY) как метрики Метрики. ([Yandex][1])
+* **Sessions**: доступен **везде, кроме SEARCH_QUERY_PERFORMANCE_REPORT** (в таблице для Sessions последний столбец “–”, а для Query наоборот только последний столбец заполнен, то есть это именно SEARCH_QUERY). ([Yandex][1])
+
+Важно: в таблице эти поля помечены как **метрика**, то есть без Метрики они не появятся.
+
+---
+
+## 2) Предусловия, чтобы в отчетах были Метрика-сессии и конверсии
+
+Минимальный набор:
+
+1. **На сайте стоит счетчик Яндекс.Метрики**, и его номер указан в кампании в параметре **CounterIds**. ([Yandex][2])
+2. Для **Conversions / ConversionRate / CostPerConversion** в этом счетчике должны быть **настроены цели**. ([Yandex][2])
+3. Желательно (и по умолчанию включено) чтобы в настройках кампании был Option **ADD_METRICA_TAG**: он автоматически добавляет в ссылки метку `yclid`, чтобы точнее стыковать клики Директа с визитами/целями в Метрике. ([Yandex][3])
+
+Про “линк Direct↔Metrica”: в практическом смысле для Reports это сводится к тому, что **кампания “знает” CounterIds**, а у вашего логина есть доступ к этому счетчику/целям.
+
+---
+
+## 3) Как работают params.Goals и params.AttributionModels (и какие значения допустимы)
+
+### Goals
+
+`Goals` = массив ID целей Метрики (строками), максимум 10.
+
+Если `Goals` задан, то в ответе **вместо агрегированных** полей:
+
+* `Conversions`, `ConversionRate`, `CostPerConversion`, `GoalsRoi`, `Revenue`
+
+вы получите **поля по каждой цели отдельно** с именами вида:
+`<Поле>_<goalId>_<attributionModel>` ([Yandex][4])
+
+Пример из документации: в запросе вы указываете просто `Conversions`, а в ответе приходят `Conversions_20002_LSC`, `Conversions_20003_LSC`, и т.д. ([Yandex][5])
+
+### AttributionModels
+
+`AttributionModels` = массив моделей атрибуции (если несколько, то данные будут по каждой модели отдельно). Значение по умолчанию: **LC**. ([Yandex][4])
+
+Допустимые значения (актуальный enum из спецификации отчета):
+
+* `FC` (first click)
+* `LC` (last click)
+* `LSC` (last significant click)
+* `LYDC` (last click from Yandex Direct)
+* `FCCD` (first click cross-device)
+* `LSCCD` (last significant cross-device)
+* `LYDCCD` (last click from Yandex Direct cross-device)
+* `AUTO` (automatic) ([Yandex][4])
+
+Нюанс по датам: для `LYDC`, `LSC`, `FC` “датой визита” считается **дата клика**, который стал источником визита (а не фактическая дата визита). Это может сдвигать попадание конверсий в период отчета. ([Yandex][4])
+
+---
+
+## 4) JSON пример: CAMPAIGN_PERFORMANCE_REPORT с сессиями и конверсиями по целям
+
+Пример: по 1 кампании, за период, с 2 целями и 2 моделями атрибуции (получите поля вида `Conversions_<goal>_<model>` и т.п.).
+
+```json
+{
+  "params": {
+    "ReportName": "Campaign performance with Metrica goals",
+    "ReportType": "CAMPAIGN_PERFORMANCE_REPORT",
+    "DateRangeType": "CUSTOM_DATE",
+    "Format": "TSV",
+    "IncludeVAT": "YES",
+    "IncludeDiscount": "NO",
+
+    "SelectionCriteria": {
+      "DateFrom": "2026-01-01",
+      "DateTo": "2026-01-15",
+      "Filter": [
+        {
+          "Field": "CampaignId",
+          "Operator": "IN",
+          "Values": ["123456789"]
+        }
+      ]
+    },
+
+    "Goals": ["20002", "20003"],
+    "AttributionModels": ["LC", "LSC"],
+
+    "FieldNames": [
+      "Date",
+      "CampaignId",
+      "CampaignName",
+      "Impressions",
+      "Clicks",
+      "Ctr",
+      "AvgCpc",
+      "Cost",
+
+      "Sessions",
+
+      "Conversions",
+      "ConversionRate",
+      "CostPerConversion"
+    ],
+
+    "OrderBy": [
+      { "Field": "Date", "SortOrder": "ASCENDING" }
+    ]
+  }
+}
+```
+
+Что вы увидите в TSV-ответе по целям:
+
+* `Conversions_20002_LC`, `Conversions_20002_LSC`, `Conversions_20003_LC`, ...
+* `ConversionRate_20002_LC`, ...
+* `CostPerConversion_20002_LC`, ... ([Yandex][4])
+
+---
+
+## 5) JSON пример: AD_PERFORMANCE_REPORT с конверсиями по целям
+
+```json
+{
+  "params": {
+    "ReportName": "Ad performance with Metrica goals",
+    "ReportType": "AD_PERFORMANCE_REPORT",
+    "DateRangeType": "CUSTOM_DATE",
+    "Format": "TSV",
+    "IncludeVAT": "YES",
+    "IncludeDiscount": "NO",
+
+    "SelectionCriteria": {
+      "DateFrom": "2026-01-01",
+      "DateTo": "2026-01-15",
+      "Filter": [
+        {
+          "Field": "CampaignId",
+          "Operator": "IN",
+          "Values": ["123456789"]
+        }
+      ]
+    },
+
+    "Goals": ["20002"],
+    "AttributionModels": ["LSC"],
+
+    "FieldNames": [
+      "Date",
+      "CampaignId",
+      "AdGroupId",
+      "AdId",
+      "Impressions",
+      "Clicks",
+      "Ctr",
+      "AvgCpc",
+      "Cost",
+
+      "Sessions",
+
+      "Conversions",
+      "ConversionRate",
+      "CostPerConversion"
+    ],
+
+    "OrderBy": [
+      { "Field": "Cost", "SortOrder": "DESCENDING" }
+    ]
+  }
+}
+```
+
+---
+
+## 6) Быстрый чеклист “почему Conversions/Sessions пустые или не приходят”
+
+* CounterIds **не задан** в кампании или счетчик **не установлен** на сайте. ([Yandex][2])
+* Цели в Метрике **не настроены/не накопили статистику** (для конверсий цели должны существовать). ([Yandex][2])
+* Вы включили `Goals`, но смотрите в ответе колонки `Conversions` без суффиксов: при `Goals` они **заменяются** на `Conversions_<goal>_<model>`. ([Yandex][4])
+* Период “не бьется” из-за модели атрибуции (для `LYDC/LSC/FC` считается дата клика). ([Yandex][4])
+
+Если скажешь, какие именно разрезы тебе нужны (дата+кампания+устройство/регион/площадка/ключи) и какие цели (ID), я соберу готовые FieldNames/Filters под конкретные отчеты так, чтобы они не конфликтовали (у Директа там есть “несовместимые поля и зависимости”).
+
+[1]: https://yandex.com/dev/direct/doc/en/fields-list "Допустимые поля | Yandex Direct API"
+[2]: https://yandex.com/dev/direct/doc/en/restrictions?utm_source=chatgpt.com "Restrictions | Yandex Direct API"
+[3]: https://yandex.ru/dev/direct/doc/en/annex/campaign-options "Настройки кампаний (параметр Option) | Yandex Direct API"
+[4]: https://yandex.ru/dev/direct/doc/ru/spec "Запрос: спецификация отчета | Яндекс Директ API"
+[5]: https://yandex.com/dev/direct/doc/en/example-metrika "Пример: данные Яндекс Метрики | Yandex Direct API"

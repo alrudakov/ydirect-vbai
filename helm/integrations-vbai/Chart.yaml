@@ -1,0 +1,6 @@
+apiVersion: v2
+name: ydirect-vbai
+description: A Helm chart for ydirect-vbai backend service
+type: application
+version: 0.1.0
+appVersion: "A1.0"

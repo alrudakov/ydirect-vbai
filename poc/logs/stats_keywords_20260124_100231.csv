@@ -1,0 +1,8 @@
+﻿Criterion,CriteriaType,Impressions,Clicks,Ctr,AvgCpc,Cost,Sessions,Conversions,ConversionRate,CostPerConversion
+---autotargeting,AUTOTARGETING,28130,246,0.87,4.20,1033.44,206,1,0.41,1033.44
+gpt-5,KEYWORD,39,4,10.26,5.47,21.88,4,0,--,--
+claude ai,KEYWORD,65,2,3.08,7.95,15.90,2,0,--,--
+нейросеть для разработчика,KEYWORD,25,2,8.00,6.89,13.77,2,0,--,--
+ai linux,KEYWORD,3,0,0.00,--,0.00,0,0,--,--
+ai помощник программиста,KEYWORD,1,0,0.00,--,0.00,0,0,--,--
+ai терминал,KEYWORD,2,0,0.00,--,0.00,0,0,--,--

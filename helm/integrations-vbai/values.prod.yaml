@@ -1,0 +1,41 @@
+replicaCount: 1
+
+livenessProbe:
+  enabled: true
+  initialDelaySeconds: 10
+  periodSeconds: 30
+  path: /live
+  port: 8080
+
+readinessProbe:
+  enabled: true
+  initialDelaySeconds: 5
+  periodSeconds: 15
+  path: /ready
+  port: 8080
+
+autoscaling:
+  enabled: true
+  minReplicas: 1
+  maxReplicas: 2
+  targetCPUUtilizationPercentage: 70
+  targetMemoryUtilizationPercentage: 80
+
+resources:
+  requests:
+    memory: "512Mi"
+    cpu: "500m"
+  limits:
+    memory: "1Gi"
+    cpu: "2000m"
+
+configMap:
+  name: ydirect-vbai-cm
+  data:
+    LOG_LEVEL: "WARNING"
+    OTLP_ADDRESS: "otel-collector-opentelemetry-collector.prometheus.svc.cluster.local:4317"
+    SERVICE_NAME: "ydirect-vbai"
+    GATEWAY_DOMAIN: "https://api.execai.ru"
+    GATEWAY_URL: "http://api-vbai-svc:80"
+
+

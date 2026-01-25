@@ -1,0 +1,69 @@
+serviceAccountName: api-vbai-sa
+
+annotations:
+  reloader.stakater.com/auto: "true"
+
+ingress:
+  enabled: false
+
+image:
+  repository: velesbsdllc/ydirect-vbai
+  tag: A1.0
+  pullPolicy: Always
+
+imagePullSecrets:
+  - name: regcred
+
+service:
+  name: ydirect-vbai-svc
+  type: ClusterIP
+  port: 80
+  targetPort: 8080
+
+livenessProbe:
+  enabled: false
+  initialDelaySeconds: 5
+  periodSeconds: 20
+  path: /live
+  port: 8080
+
+readinessProbe:
+  enabled: false
+  initialDelaySeconds: 1
+  periodSeconds: 10
+  path: /ready
+  port: 8080
+
+autoscaling:
+  enabled: true
+  minReplicas: 1
+  maxReplicas: 2
+  targetCPUUtilizationPercentage: 70
+  targetMemoryUtilizationPercentage: 80
+
+resources:
+  requests:
+    memory: "256Mi"
+    cpu: "500m"
+  limits:
+    memory: "512Mi"
+    cpu: "1000m"
+
+configMap:
+  name: ydirect-vbai-cm
+  data:
+    LOG_LEVEL: "DEBUG"
+    OTLP_ADDRESS: "otel-collector-opentelemetry-collector.prometheus.svc.cluster.local:4317"
+    SERVICE_NAME: "ydirect-vbai"
+    GATEWAY_DOMAIN: "http://apidev2.velesbsd.com"
+    GATEWAY_URL: "http://api-vbai-svc:80"
+
+# IMPORTANT:
+# DEV (и STAGE) используют подключение к PROD базе.
+envFromSecrets:
+  - name: SERVICE_ACCOUNT_TOKEN
+    secretName: api-token
+    key: token
+  - name: DATABASE_URL
+    secretName: ydirect-vbai-secret
+    key: DATABASE_URL

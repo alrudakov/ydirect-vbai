@@ -1,62 +1,46 @@
 #!/bin/bash
+# =============================================================================
+# kubectl команды для создания секретов ydirect-vbai
+# =============================================================================
 
-# ========================================
-# Kubernetes Secrets для stat-vbai
-# ========================================
+echo "=============================================="
+echo "DEV Environment (namespace: dev)"
+echo "=============================================="
 
-echo "Создание Kubernetes секретов для stat-vbai"
+echo "kubectl create secret generic ydirect-vbai-secret -n dev \\"
+echo "  --from-literal=DATABASE_URL=\"mysql+aiomysql://ydirect_vbai:YdIr3ct_D3v_2026@172.16.0.35:3306/ydirect_vbai\" \\"
+echo "  --dry-run=client -o yaml | kubectl apply -f -"
+
+# Реальная команда:
+# kubectl create secret generic ydirect-vbai-secret -n dev \
+#   --from-literal=DATABASE_URL="mysql+aiomysql://ydirect_vbai:YdIr3ct_D3v_2026@172.16.0.35:3306/ydirect_vbai" \
+#   --dry-run=client -o yaml | kubectl apply -f -
+
 echo ""
+echo "=============================================="
+echo "STAGE Environment (namespace: stage)"
+echo "=============================================="
 
-# ========================================
-# DEV ENVIRONMENT
-# ========================================
-echo "DEV Environment:"
-echo "kubectl create secret generic stat-vbai-secret \\"
-echo "  --from-literal=DATABASE_URL=\"mysql+aiomysql://stat_vbai:VvK8mN2pL9xR4tQ7@172.16.0.35:3306/stat_vbai\" \\"
-echo "  -n default"
+echo "kubectl create secret generic ydirect-vbai-secret -n stage \\"
+echo "  --from-literal=DATABASE_URL=\"mysql+aiomysql://ydirect_vbai:YdIr3ct_St4g3_2026@172.16.0.106:3306/ydirect_vbai\" \\"
+echo "  --dry-run=client -o yaml | kubectl apply -f -"
+
+# Реальная команда:
+# kubectl create secret generic ydirect-vbai-secret -n stage \
+#   --from-literal=DATABASE_URL="mysql+aiomysql://ydirect_vbai:YdIr3ct_St4g3_2026@172.16.0.106:3306/ydirect_vbai" \
+#   --dry-run=client -o yaml | kubectl apply -f -
+
 echo ""
+echo "=============================================="
+echo "PROD Environment (namespace: prod) - НЕ СОЗДАВАТЬ ПОКА"
+echo "=============================================="
+echo "# kubectl create secret generic ydirect-vbai-secret -n prod \\"
+echo "#   --from-literal=DATABASE_URL=\"mysql+aiomysql://ydirect_vbai:PROD_PASSWORD@PROD_HOST:3306/ydirect_vbai\" \\"
+echo "#   --dry-run=client -o yaml | kubectl apply -f -"
 
-# Или можешь выполнить:
-# kubectl create secret generic stat-vbai-secret \
-#   --from-literal=DATABASE_URL="mysql+aiomysql://stat_vbai:VvK8mN2pL9xR4tQ7@172.16.0.35:3306/stat_vbai" \
-#   -n default
-
-
-# ========================================
-# STAGE ENVIRONMENT
-# ========================================
-echo "STAGE Environment:"
-echo "kubectl create secret generic stat-vbai-secret \\"
-echo "  --from-literal=DATABASE_URL=\"mysql+aiomysql://stat_vbai:StAgE_VvK8mN2pL9xR4tQ7@172.16.0.106:3306/stat_vbai\" \\"
-echo "  -n default"
 echo ""
-
-# Или можешь выполнить:
-# kubectl create secret generic stat-vbai-secret \
-#   --from-literal=DATABASE_URL="mysql+aiomysql://stat_vbai:StAgE_VvK8mN2pL9xR4tQ7@172.16.0.106:3306/stat_vbai" \
-#   -n default
-
-
-# ========================================
-# PROD ENVIRONMENT
-# ========================================
-echo "PROD Environment (укажи свой пароль и хост):"
-echo "kubectl create secret generic stat-vbai-secret \\"
-echo "  --from-literal=DATABASE_URL=\"mysql+aiomysql://stat_vbai:PROD_PASSWORD@PROD_HOST:3306/stat_vbai\" \\"
-echo "  -n production"
-echo ""
-
-
-# ========================================
-# Проверка секретов
-# ========================================
-echo "Проверка созданных секретов:"
-echo "kubectl get secret stat-vbai-secret -n default"
-echo "kubectl describe secret stat-vbai-secret -n default"
-echo ""
-
-# Чтобы посмотреть значение:
-echo "Посмотреть значение DATABASE_URL:"
-echo "kubectl get secret stat-vbai-secret -n default -o jsonpath='{.data.DATABASE_URL}' | base64 -d"
-echo ""
-
+echo "=============================================="
+echo "Проверка секретов:"
+echo "=============================================="
+echo "kubectl get secret ydirect-vbai-secret -n dev -o yaml"
+echo "kubectl get secret ydirect-vbai-secret -n stage -o yaml"

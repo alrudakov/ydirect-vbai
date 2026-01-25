@@ -1,101 +1,71 @@
--- SQL команды для создания базы данных stat-vbai в MySQL
+-- =============================================================================
+-- SQL для создания БД и юзера ydirect-vbai
+-- =============================================================================
 
--- ====================================
--- DEV ENVIRONMENT (172.16.0.35:3306)
--- ====================================
+-- =============================================================================
+-- DEV Environment (172.16.0.35)
+-- =============================================================================
 
--- Создаем базу данных для DEV
-CREATE DATABASE IF NOT EXISTS stat_vbai CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+-- Создание БД
+CREATE DATABASE IF NOT EXISTS ydirect_vbai 
+  CHARACTER SET utf8mb4 
+  COLLATE utf8mb4_unicode_ci;
 
--- Создаем пользователя для DEV
-CREATE USER IF NOT EXISTS 'stat_vbai'@'%' IDENTIFIED BY 'VvK8mN2pL9xR4tQ7';
+-- Создание юзера
+CREATE USER IF NOT EXISTS 'ydirect_vbai'@'%' IDENTIFIED BY 'YdIr3ct_D3v_2026';
 
--- Даем права для DEV
-GRANT ALL PRIVILEGES ON stat_vbai.* TO 'stat_vbai'@'%';
+-- Права
+GRANT ALL PRIVILEGES ON ydirect_vbai.* TO 'ydirect_vbai'@'%';
 FLUSH PRIVILEGES;
 
--- Проверяем подключение DEV:
--- mysql -h 172.16.0.35 -u stat_vbai -p stat_vbai
+-- Проверка
+SELECT 'DEV: ydirect_vbai DB and user created' AS status;
+SELECT User, Host FROM mysql.user WHERE User = 'ydirect_vbai';
 
 
--- ====================================
--- STAGE ENVIRONMENT (172.16.0.106:3306)
--- ====================================
+-- =============================================================================
+-- STAGE Environment (172.16.0.106)
+-- =============================================================================
 
--- Создаем базу данных для STAGE
-CREATE DATABASE IF NOT EXISTS stat_vbai CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+-- Создание БД
+CREATE DATABASE IF NOT EXISTS ydirect_vbai 
+  CHARACTER SET utf8mb4 
+  COLLATE utf8mb4_unicode_ci;
 
--- Создаем пользователя для STAGE
-CREATE USER IF NOT EXISTS 'stat_vbai'@'%' IDENTIFIED BY 'StAgE_VvK8mN2pL9xR4tQ7';
+-- Создание юзера
+CREATE USER IF NOT EXISTS 'ydirect_vbai'@'%' IDENTIFIED BY 'YdIr3ct_St4g3_2026';
 
--- Даем права для STAGE
-GRANT ALL PRIVILEGES ON stat_vbai.* TO 'stat_vbai'@'%';
+-- Права
+GRANT ALL PRIVILEGES ON ydirect_vbai.* TO 'ydirect_vbai'@'%';
 FLUSH PRIVILEGES;
 
--- Проверяем подключение STAGE:
--- mysql -h 172.16.0.106 -u stat_vbai -p stat_vbai
+-- Проверка
+SELECT 'STAGE: ydirect_vbai DB and user created' AS status;
 
 
--- ====================================
--- PRODUCTION ENVIRONMENT
--- ====================================
+-- =============================================================================
+-- Таблица (создаётся автоматически миграциями, но можно вручную)
+-- =============================================================================
 
--- Создаем базу данных для PROD
-CREATE DATABASE IF NOT EXISTS stat_vbai CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+USE ydirect_vbai;
 
--- Создаем пользователя для PROD (используй свой сильный пароль!)
-CREATE USER IF NOT EXISTS 'stat_vbai'@'%' IDENTIFIED BY 'PROD_SuperSecurePassword_2024';
+CREATE TABLE IF NOT EXISTS ydirect_profiles (
+    user_email VARCHAR(255) NOT NULL,
+    alias VARCHAR(255) NOT NULL,
+    token TEXT NOT NULL,
+    description VARCHAR(500) DEFAULT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (user_email, alias),
+    INDEX idx_user_email (user_email)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- Даем права для PROD
-GRANT ALL PRIVILEGES ON stat_vbai.* TO 'stat_vbai'@'%';
-FLUSH PRIVILEGES;
-
-
--- ====================================
--- CONNECTION STRINGS для Kubernetes Secrets
--- ====================================
-
--- DEV (values.yaml):
--- DATABASE_URL: "mysql+aiomysql://stat_vbai:VvK8mN2pL9xR4tQ7@172.16.0.35:3306/stat_vbai"
-
--- STAGE (values.stage.yaml):
--- DATABASE_URL: "mysql+aiomysql://stat_vbai:StAgE_VvK8mN2pL9xR4tQ7@172.16.0.106:3306/stat_vbai"
-
--- PROD:
--- DATABASE_URL: "mysql+aiomysql://stat_vbai:PROD_SuperSecurePassword_2024@PROD_HOST:3306/stat_vbai"
+SELECT 'Table ydirect_profiles ready' AS status;
 
 
--- ====================================
--- Kubernetes Secret Creation Commands
--- ====================================
-
--- DEV environment:
--- kubectl create secret generic stat-vbai-secret \
---   --from-literal=DATABASE_URL="mysql+aiomysql://stat_vbai:VvK8mN2pL9xR4tQ7@172.16.0.35:3306/stat_vbai" \
---   -n default
-
--- STAGE environment:
--- kubectl create secret generic stat-vbai-secret \
---   --from-literal=DATABASE_URL="mysql+aiomysql://stat_vbai:StAgE_VvK8mN2pL9xR4tQ7@172.16.0.106:3306/stat_vbai" \
---   -n default
-
--- PROD environment:
--- kubectl create secret generic stat-vbai-secret \
---   --from-literal=DATABASE_URL="mysql+aiomysql://stat_vbai:PROD_SuperSecurePassword_2024@PROD_HOST:3306/stat_vbai" \
---   -n default
-
-
--- ====================================
--- Проверка таблиц после первого запуска
--- ====================================
-
--- USE stat_vbai;
--- SHOW TABLES;
--- 
--- Должны быть созданы таблицы:
--- - revenue_records
--- - cost_records
--- - user_subscriptions
--- - daily_stats
--- - monthly_stats
-
+-- =============================================================================
+-- Быстрые команды для подключения:
+-- =============================================================================
+-- DEV:   mysql -h 172.16.0.35 -u ydirect_vbai -pYdIr3ct_D3v_2026 ydirect_vbai
+-- STAGE: mysql -h 172.16.0.106 -u ydirect_vbai -pYdIr3ct_St4g3_2026 ydirect_vbai
+-- =============================================================================

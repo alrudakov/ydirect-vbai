@@ -1,47 +1,53 @@
+"""
+Регистрация сервиса в API Gateway (api-vbai)
+Аналогично ssh-vbai
+"""
 import os
 import requests
 import logging
 from app.config import settings
 
-# Настройка логирования
-logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
-API_GATEWAY_URL = os.environ.get("GATEWAY_URL")
+API_GATEWAY_URL = os.environ.get("GATEWAY_URL", settings.GATEWAY_URL)
+
+# Эндпоинты для регистрации
 ENDPOINTS = [
-    # Terminal POC
-    {"path": "/api/ssh/creds", "method": "GET", "accessType": "Internal"},
-    {"path": "/api/terminal/connect", "method": "POST", "accessType": "Internal"},
-    # NOTE: api-vbai gateway allows wildcard only at the end of the path and
-    # internally normalizes endpoints to ".../*".
-    # Our actual routes:
-    # - GET  /api/terminal/windows/{session_id}
-    # - POST /api/terminal/windows/{session_id}/select
-    #
-    # Therefore we register:
-    # - GET  /api/terminal/windows/*
-    # - POST /api/terminal/windows/*
-    # NOTE: api-vbai gateway stores endpoints by PATH (method gets overwritten on re-register),
-    # so we use POST for both list + select under the same wildcard entry.
-    {"path": "/api/terminal/windows/*", "method": "POST", "accessType": "Internal"},
-    # AI tools (called by aihandler inside cluster; can be System)
-    {"path": "/ai/terminal_input", "method": "POST", "accessType": "Internal"},
-    {"path": "/ai/terminal_keys", "method": "POST", "accessType": "Internal"},
-    {"path": "/ai/terminal_view", "method": "POST", "accessType": "Internal"},
-    {"path": "/ai/terminal_screen", "method": "POST", "accessType": "Internal"},
-    {"path": "/ai/terminal_wait", "method": "POST", "accessType": "Internal"},
-    # WebSocket handshake is HTTP GET. Gateway обычно проверяет allow-list путей.
-    # Важно: реальный путь = /ws/terminal/{sessionId}, gateway матчит через wildcard candidates.
-    {"path": "/ws/terminal/*", "method": "GET", "accessType": "Public"},
+    # Управление профилями
+    {"path": "/profiles/add", "method": "POST", "accessType": "Public"},
+    {"path": "/profiles/list", "method": "POST", "accessType": "Public"},
+    {"path": "/profiles/delete", "method": "POST", "accessType": "Public"},
+    
+    # AI endpoints (вызываются из aihandler)
+    {"path": "/ai/campaigns", "method": "POST", "accessType": "Internal"},
+    {"path": "/ai/campaigns/create", "method": "POST", "accessType": "Internal"},
+    {"path": "/ai/campaigns/budget", "method": "POST", "accessType": "Internal"},
+    {"path": "/ai/campaigns/rsya", "method": "POST", "accessType": "Internal"},
+    {"path": "/ai/stats", "method": "POST", "accessType": "Internal"},
+    {"path": "/ai/adgroups", "method": "POST", "accessType": "Internal"},
+    {"path": "/ai/adgroups/create", "method": "POST", "accessType": "Internal"},
+    {"path": "/ai/keywords/add", "method": "POST", "accessType": "Internal"},
+    {"path": "/ai/ads", "method": "POST", "accessType": "Internal"},
+    {"path": "/ai/ads/create", "method": "POST", "accessType": "Internal"},
+    {"path": "/ai/ads/moderate", "method": "POST", "accessType": "Internal"},
+    
+    # Health checks
+    {"path": "/health", "method": "GET", "accessType": "Public"},
+    {"path": "/live", "method": "GET", "accessType": "Public"},
+    {"path": "/ready", "method": "GET", "accessType": "Public"},
 ]
 
-def register_service_and_endpoints(token):
+
+def register_service_and_endpoints(token: str) -> bool:
+    """Регистрация сервиса и эндпоинтов в API Gateway"""
     url = f"{API_GATEWAY_URL}/register/services"
     headers = {"System": f"{token}"}
+    
     data = {
-        "name": settings.APP_NAME,
+        "name": settings.SERVICE_NAME,
         "endpoints": [
             {
-                "serviceName": settings.APP_NAME,
+                "serviceName": settings.SERVICE_NAME,
                 "method": endpoint["method"],
                 "path": endpoint["path"],
                 "accessType": endpoint["accessType"]
@@ -49,30 +55,33 @@ def register_service_and_endpoints(token):
         ]
     }
     
-    logging.info(f"Registering service and endpoints at {url} with data {data} and headers {headers}")
-    # Запрос к внутреннему API должен идти БЕЗ прокси
+    logger.info(f"Registering {settings.SERVICE_NAME} at {url}")
+    logger.debug(f"Endpoints: {len(ENDPOINTS)}")
+    
+    # Запрос к внутреннему API без прокси
     with requests.Session() as s:
-        s.trust_env = False  # не использовать системные переменные прокси
-        response = s.post(url, headers=headers, json=data)
-
+        s.trust_env = False
+        response = s.post(url, headers=headers, json=data, timeout=30)
+    
     if response.status_code != 200:
         if 'Duplicate entry' in response.text:
-            logging.info("Service and endpoints already registered.")
-            return False
+            logger.info("Service and endpoints already registered")
+            return True
         else:
-            logging.error(f"Error registering service and endpoints: {response.text}")
-            raise Exception("Error registering service and endpoints: " + response.text)
+            logger.error(f"Error registering: {response.text}")
+            return False
     
-    logging.info("Service and endpoint registration successful.")
+    logger.info("Service and endpoint registration successful")
     return True
 
+
 def api_reg():
+    """Главная функция регистрации"""
     token = os.environ.get("SERVICE_ACCOUNT_TOKEN")
+    
     if not token:
-        raise Exception("Error reading service account token")
-
+        logger.warning("SERVICE_ACCOUNT_TOKEN not set, skipping gateway registration")
+        return
+    
     if not register_service_and_endpoints(token):
-        raise Exception("Error registering service and endpoints")
-
-    logging.info("Service and endpoint registration successful")
-
+        logger.warning("Failed to register in API Gateway")

@@ -2,7 +2,7 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
-# Копируем requirements и устанавливаем зависимости
+# Установка зависимостей
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
@@ -13,6 +13,4 @@ COPY app/ ./app/
 EXPOSE 8080
 
 # Запуск приложения
-#CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8080"]
-# tail f
-CMD ["tail", "-f", "/dev/null"]
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8080"]

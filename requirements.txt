@@ -1,5 +1,22 @@
+# FastAPI
 fastapi==0.104.1
 uvicorn[standard]==0.24.0
+
+# Database
 sqlalchemy==2.0.23
 aiomysql==0.2.0
+
+# Pydantic
 pydantic-settings==2.1.0
+
+# HTTP client (async)
+httpx==0.25.2
+
+# JWT
+PyJWT==2.8.0
+
+# Encryption
+cryptography==41.0.7
+
+# API Gateway registration
+requests==2.31.0
